@@ -1,0 +1,13 @@
+# Compiled C/C++ extension modules
+_C*.so
+_C*.pyd
+
+# Python bytecode / cache
+__pycache__/
+*.py[cod]
+
+# setuptools / pip build artifacts
+build/
+dist/
+*.egg-info/
+.eggs/
