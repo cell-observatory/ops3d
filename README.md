@@ -122,8 +122,7 @@ Shared memory : maskSH[G_blk, L, K]  // logits for this block
 
 ### Deformable 3D Convolution V4
 
-A **3-D adaptation of DCNv4 deformable convolution** that samples a  $K = k_d \times k_h \times k_w$ grid of offsets (default **`3` × `3` × `3` = `27`**) per voxel.  
-Two fully-custom kernels mirror the attention implementation.
+A **3-D adaptation of DCNv4 deformable convolution** that samples a  $K = k_d \times k_h \times k_w$ grid of offsets (default **`3` × `3` × `3` = `27`**) per voxel. Two fully-custom kernels mirror the attention implementation.
 
 #### Register & Warp-Level Pipeline  <a id="alg-dcn-reg"></a>
 
