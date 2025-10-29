@@ -98,7 +98,7 @@ if __name__ == "__main__":
         description='Custom 3D Operations for PyTorch',
         packages=["ops3d"],
         package_dir={"ops3d": "."},
-        install_requires=load_requires(),
+        # install_requires=load_requires(),
         ext_modules=get_extensions(),
         cmdclass={'build_ext': cpp_extension.BuildExtension},
         classifiers=[
