@@ -137,7 +137,8 @@ flash_deform_attn_cuda_backward(
     AT_ASSERTM(batch % im2col_step_ == 0, "batch(", batch,") must divide im2col_step(", im2col_step_, ")");
 
     auto dtype = value.dtype();
-    if (dtype == at::kHalf){
+    // We accumulate in float for Half *and* BFloat16
+    if (dtype == at::kHalf || dtype == at::kBFloat16) {
         dtype = at::kFloat;
     }
 
@@ -167,10 +168,12 @@ flash_deform_attn_cuda_backward(
         }));
     }
 
-    if(value.dtype() == torch::kHalf){
-        return {grad_input.to(torch::kHalf), grad_offset.to(torch::kHalf)};
-    }
-    else{
+    if (value.dtype() == at::kHalf || value.dtype() == at::kBFloat16) {
+        return {
+            grad_input.to(value.dtype()),
+            grad_offset.to(value.dtype())
+        };
+    } else {
         return {grad_input, grad_offset};
     }
 }
