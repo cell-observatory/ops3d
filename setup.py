@@ -63,17 +63,23 @@ def get_extensions():
         'nvcc': nvcc_flags + ['-allow-unsupported-compiler'] + nvcc_deform_attn_flags,
     }
 
-    # sources = [os.path.join(extensions_dir, s) for s in sources]
-    # include_dirs = [extensions_dir, numpy.get_include()]
-
+    # Use PyTorch's CUDA include directories to match PyTorch's CUDA version
+    # This ensures we compile against the same CUDA version that PyTorch uses
+    torch_include_dirs = cpp_extension.include_paths()
+    torch_lib = os.path.join(os.path.dirname(torch.__file__), "lib")
+    
     include_dirs = [
         os.path.relpath(extensions_dir, start=this_dir), 
         numpy.get_include(),
-        os.path.join(CUDA_HOME or "/usr/local/cuda", "include"),
-        ]
+    ] + torch_include_dirs
     
-    torch_lib = os.path.join(os.path.dirname(torch.__file__), "lib")
+    # Link against PyTorch's CUDA libraries to avoid version mismatches
+    # BuildExtension will automatically add PyTorch's library paths
     extra_link_args = [f"-Wl,-rpath,{torch_lib}"]
+    
+    # Ensure we use PyTorch's CUDA runtime libraries, not system CUDA_HOME
+    # The curand library should come from PyTorch's CUDA installation
+    library_dirs = [torch_lib]
 
     ext_modules = [
         extension(
@@ -83,6 +89,7 @@ def get_extensions():
             define_macros=define_macros,
             extra_compile_args=extra_compile_args,
             extra_link_args=extra_link_args,
+            library_dirs=library_dirs,
             libraries=['curand'],  
         )
     ]
