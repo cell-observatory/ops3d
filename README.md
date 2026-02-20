@@ -42,6 +42,33 @@ python -m pytest tests/ -v
 
 Tests require CUDA and a compiled ops3d package (`pip install -e .`).
 
+Run stress tests (edge shapes, invalid inputs, numerics, gradients):
+
+```bash
+pytest tests/ -m gpu_stress -v
+```
+
+## Benchmarking
+
+Benchmark MSDeformAttn vs Flash SDPA (head-to-head comparison):
+
+```bash
+python -m tests.benchmark_flash_deform_attn
+```
+
+Compares:
+- **MSDeformAttn** (CUDA kernel): sparse attention, L×K samples per query
+- **MSDeformAttn** (PyTorch ref): naive implementation
+- **Flash SDPA**: dense cross-attention over all S positions
+
+Options:
+- `--dtype bfloat16|float16|float32` — Data type (default: bfloat16)
+- `--warmup N` — Warmup iterations (default: 5)
+- `--repeats N` — Timed repeats (default: 20)
+- `--config small|medium|large` — Run single problem size (default: all)
+
+Output includes: wall time (mean ± std), throughput (M elements/s), peak GPU memory, speedup, and ASCII bar visualization.
+
 ## Kernels
 
 ### Flash Deformable 3D Attention
