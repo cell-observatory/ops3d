@@ -24,8 +24,23 @@ https://github.com/cell-observatory/ops3d.git
 cd ops3d
 
 # 3. Install package in editable mode
-pip install -e . 
+pip install -e .
+
+# 4. (Optional) Install dev dependencies for testing
+pip install -r requirements-dev.txt
 ```
+
+## Testing
+
+Run the flash deformable attention tests (kernel vs PyTorch reference):
+
+```bash
+pytest tests/ -v
+# or
+python -m pytest tests/ -v
+```
+
+Tests require CUDA and a compiled ops3d package (`pip install -e .`).
 
 ## Kernels
 

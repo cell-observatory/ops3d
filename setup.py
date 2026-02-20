@@ -66,13 +66,13 @@ def get_extensions():
     # Use PyTorch's CUDA include directories to match PyTorch's CUDA version
     # This ensures we compile against the same CUDA version that PyTorch uses
     torch_include_dirs = cpp_extension.include_paths()
-    torch_lib = os.path.join(os.path.dirname(torch.__file__), "lib")
     
     include_dirs = [
         os.path.relpath(extensions_dir, start=this_dir), 
         numpy.get_include(),
     ] + torch_include_dirs
     
+    torch_lib = os.path.join(os.path.dirname(torch.__file__), "lib")
     # Link against PyTorch's CUDA libraries to avoid version mismatches
     # BuildExtension will automatically add PyTorch's library paths
     extra_link_args = [f"-Wl,-rpath,{torch_lib}"]
