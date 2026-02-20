@@ -2,6 +2,14 @@
 
 from __future__ import absolute_import, division, print_function
 
+import sys
+from pathlib import Path
+
+# Ensure project root is on path so "tests" package is importable
+_root = Path(__file__).resolve().parent.parent
+if str(_root) not in sys.path:
+    sys.path.insert(0, str(_root))
+
 import pytest
 import torch
 
@@ -19,6 +27,10 @@ except ImportError:
 
 
 def pytest_configure(config):
+    config.addinivalue_line(
+        "markers",
+        "gpu_stress: stress tests (slow, run with -m gpu_stress)",
+    )
     if not OPS3D_AVAILABLE:
         config.addinivalue_line(
             "markers",
@@ -76,6 +88,32 @@ def default_backward_params():
         dtype=torch.long,
         device="cuda",
     )
+    level_start_index = torch.cat(
+        (shapes.new_zeros(1), shapes.prod(1).cumsum(0)[:-1])
+    )
+    S = int(shapes.prod(1).sum())
+    return {
+        "N": N,
+        "M": M,
+        "D": D,
+        "Lq": Lq,
+        "L": L,
+        "K": K,
+        "im2col_step": im2col_step,
+        "shapes": shapes,
+        "level_start_index": level_start_index,
+        "S": S,
+    }
+
+
+@pytest.fixture(scope="session")
+def stress_params():
+    """Small config for stress tests (fast)."""
+    N, M, D = 1, 4, 32
+    Lq = 64
+    L, K = 1, 4
+    im2col_step = 1
+    shapes = torch.tensor([[4, 4, 4]], dtype=torch.long, device="cuda")
     level_start_index = torch.cat(
         (shapes.new_zeros(1), shapes.prod(1).cumsum(0)[:-1])
     )
