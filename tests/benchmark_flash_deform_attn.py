@@ -15,8 +15,10 @@ Run from ops3d root:
 from __future__ import absolute_import, division, print_function
 
 import argparse
+import fnmatch
 import sys
 import time
+from math import prod
 from pathlib import Path
 
 # Ensure project root is on path
@@ -33,39 +35,91 @@ from tests.flash_deform_attn import (
     ms_deform_attn_core_pytorch_3d,
 )
 
-# Default benchmark configs: (N, M, D, Lq, L, K, shapes)
-BENCHMARK_CONFIGS = [
-    {
-        "name": "small",
-        "N": 1,
-        "M": 4,
-        "D": 64,
-        "Lq": 16 * 16 * 16,
-        "L": 2,
-        "K": 4,
-        "shapes": [[32, 32, 32], [16, 16, 16]],
-    },
-    {
-        "name": "medium",
-        "N": 1,
-        "M": 8,
-        "D": 128,
-        "Lq": 32 * 32 * 32,
-        "L": 3,
-        "K": 8,
-        "shapes": [[64, 64, 64], [32, 32, 32], [16, 16, 16]],
-    },
-    {
-        "name": "large",
-        "N": 1,
-        "M": 8,
-        "D": 256,
-        "Lq": 32 * 32 * 32,
-        "L": 4,
-        "K": 8,
-        "shapes": [[64, 64, 64], [32, 32, 32], [16, 16, 16], [8, 8, 8]],
-    },
+
+COP_LARGE_DEFAULTS = {
+    "num_heads": 8,
+    "embed_dim": 256,
+    "num_points": 4,
+    "num_queries": 200,
+    "batch_size": 8,
+}
+
+
+def parse_config(cfg: dict) -> dict:
+    """Parse human-readable config into N, M, D, Lq, L, K, shapes."""
+    if "patch_size" not in cfg:
+        return cfg
+
+    patch_size = tuple(cfg["patch_size"])
+    strides = tuple(cfg["strides"])
+    num_heads = cfg["num_heads"]
+    embed_dim = cfg["embed_dim"]
+    num_points = cfg["num_points"]
+    mode = cfg.get("mode", "self")
+    batch_size = cfg.get("batch_size", 1)
+
+    shapes = [[patch_size[i] // s for i in range(3)] for s in strides]
+    S = sum(prod(s) for s in shapes)
+    L = len(strides)
+
+    N = batch_size
+    M = num_heads
+    D = embed_dim // num_heads
+    K = num_points
+    Lq = S if mode == "self" else cfg["num_queries"]
+
+    return {
+        "name": cfg.get("name", "unnamed"),
+        "N": N,
+        "M": M,
+        "D": D,
+        "Lq": Lq,
+        "L": L,
+        "K": K,
+        "shapes": shapes,
+        "S": S,
+        "patch_size": patch_size,
+        "strides": strides,
+        "mode": mode,
+        "num_heads": num_heads,
+        "embed_dim": embed_dim,
+        "num_points": num_points,
+        "num_queries": cfg.get("num_queries") if mode == "cross" else None,
+        "batch_size": batch_size,
+    }
+
+
+INPUT_STRIDE_CONFIGS = [
+    ("hypercube", (128, 256, 512), (8, 16, 32)),
+    ("hypercube", (128, 256, 512), (16, 32)),
+    ("hypercube", (128, 256, 512), (8, 16)),
+    ("hypercube", (128, 256, 512), (8,)),
+    ("hypercube", (128, 256, 512), (16,)),
+    ("tile", (256, 512, 2048), (8, 16, 32)),
+    ("tile", (256, 512, 2048), (16, 32)),
+    ("tile", (256, 512, 2048), (8, 16)),
+    ("tile", (256, 512, 2048), (8,)),
+    ("tile", (256, 512, 2048), (16,)),
 ]
+
+
+def build_named_configs():
+    configs = []
+    for input_name, patch_size, strides in INPUT_STRIDE_CONFIGS:
+        strides_str = "_".join(map(str, strides))
+        for mode in ("self", "cross"):
+            cfg = {
+                "name": f"{mode}_{input_name}_strides_{strides_str}",
+                "mode": mode,
+                "patch_size": patch_size,
+                "strides": strides,
+                **COP_LARGE_DEFAULTS,
+            }
+            configs.append(parse_config(cfg))
+    return configs
+
+
+BENCHMARK_CONFIGS = build_named_configs()
 
 
 def _format_bytes(n):
@@ -235,6 +289,15 @@ def run_benchmark(
 
     return {
         "config_name": config["name"],
+        "patch_size": config.get("patch_size"),
+        "strides": config.get("strides"),
+        "mode": config.get("mode"),
+        "num_heads": config.get("num_heads"),
+        "embed_dim": config.get("embed_dim"),
+        "num_points": config.get("num_points"),
+        "num_queries": config.get("num_queries"),
+        "batch_size": config.get("batch_size"),
+        "shapes": config["shapes"],
         "N": N,
         "M": M,
         "D": D,
@@ -279,8 +342,42 @@ def print_results(results):
     for r in results:
         name = r["config_name"]
         print()
-        print(f"  [{name}] N={r['N']} Lq={r['Lq']} M={r['M']} D={r['D']} L={r['L']} K={r['K']} S={r['S']} ({r['dtype']})")
+        print(f"  [{name}] ({r['dtype']})")
         print("-" * w)
+        if r.get("patch_size") is not None:
+            print("  Config:")
+            print(f"    patch_size={r['patch_size']}  strides={r.get('strides')}  mode={r.get('mode')}")
+            parts = [
+                f"num_heads={r.get('num_heads')}",
+                f"embed_dim={r.get('embed_dim')}",
+                f"num_queries={r.get('num_queries') or r.get('Lq')}",
+                f"num_points={r.get('num_points')}",
+                f"batch_size={r.get('batch_size')}",
+            ]
+            print(f"    {'  '.join(str(p) for p in parts)}")
+        print(
+            "  Parsed: N={} Lq={} M={} D={} L={} K={} S={}  shapes={}".format(
+                r["N"], r["Lq"], r["M"], r["D"], r["L"], r["K"], r["S"], r.get("shapes", [])
+            )
+        )
+        print("-" * w)
+
+        if r.get("oom"):
+            oom_msg = r.get("oom_message", "CUDA out of memory")
+            oom_val = "OOM (crashed)"
+            print(f"  *** {oom_msg} ***")
+            print()
+
+            def row(metric, k_val, r_val, f_val, imp_val):
+                return f"  {metric:<{mw}} {k_val:>{cw}} {r_val:>{cw}} {f_val:>{cw}} {imp_val:>{sw}}"
+
+            print(row("Metric", "MSDeform", "PyTorch Ref", "Flash SDPA", "MSDeform Improvement"))
+            print(sep)
+            print(row("Time (mean ± std)", oom_val, oom_val, oom_val, "—"))
+            print(row("Throughput (M el/s)", oom_val, oom_val, oom_val, "—"))
+            print(row("Peak GPU memory", oom_val, oom_val, oom_val, "—"))
+            print()
+            continue
 
         k_mean = r["kernel_mean_ms"]
         k_std = r["kernel_std_ms"]
@@ -364,9 +461,9 @@ def main():
     )
     parser.add_argument(
         "--config",
-        choices=["small", "medium", "large"],
+        type=str,
         default=None,
-        help="Run single config (default: all)",
+        help="Config name or fnmatch pattern (e.g. self_hypercube_strides_16_32 or 'self_hypercube*'). Default: all",
     )
     args = parser.parse_args()
 
@@ -386,15 +483,63 @@ def main():
 
     configs = BENCHMARK_CONFIGS
     if args.config:
-        configs = [c for c in configs if c["name"] == args.config]
+        configs = [
+            c
+            for c in configs
+            if c["name"] == args.config or fnmatch.fnmatch(c["name"], args.config)
+        ]
         if not configs:
-            print(f"Unknown config: {args.config}")
+            print(f"No configs match: {args.config}")
             sys.exit(1)
 
     results = []
     for cfg in configs:
-        r = run_benchmark(cfg, device, dtype, args.warmup, args.repeats)
-        results.append(r)
+        try:
+            r = run_benchmark(cfg, device, dtype, args.warmup, args.repeats)
+            results.append(r)
+        except (torch.cuda.OutOfMemoryError, RuntimeError) as e:
+            if "out of memory" in str(e).lower() or "OutOfMemoryError" in type(e).__name__:
+                torch.cuda.empty_cache()
+                oom_result = {
+                    "config_name": cfg["name"],
+                    "patch_size": cfg.get("patch_size"),
+                    "strides": cfg.get("strides"),
+                    "mode": cfg.get("mode"),
+                    "num_heads": cfg.get("num_heads"),
+                    "embed_dim": cfg.get("embed_dim"),
+                    "num_points": cfg.get("num_points"),
+                    "num_queries": cfg.get("num_queries"),
+                    "batch_size": cfg.get("batch_size"),
+                    "shapes": cfg["shapes"],
+                    "N": cfg["N"],
+                    "M": cfg["M"],
+                    "D": cfg["D"],
+                    "Lq": cfg["Lq"],
+                    "L": cfg["L"],
+                    "K": cfg["K"],
+                    "S": cfg["S"],
+                    "n_elements": cfg["N"] * cfg["Lq"] * cfg["M"] * cfg["D"],
+                    "dtype": str(dtype).split(".")[-1],
+                    "oom": True,
+                    "oom_message": str(e)[:80],
+                    "kernel_mean_ms": float("nan"),
+                    "kernel_std_ms": float("nan"),
+                    "ref_mean_ms": float("nan"),
+                    "ref_std_ms": float("nan"),
+                    "flash_mean_ms": float("nan"),
+                    "flash_std_ms": float("nan"),
+                    "speedup_vs_ref": float("nan"),
+                    "speedup_vs_flash": float("nan"),
+                    "kernel_throughput_Mel_s": float("nan"),
+                    "ref_throughput_Mel_s": float("nan"),
+                    "flash_throughput_Mel_s": float("nan"),
+                    "kernel_mem_peak": 0,
+                    "ref_mem_peak": 0,
+                    "flash_mem_peak": 0,
+                }
+                results.append(oom_result)
+            else:
+                raise
 
     print_results(results)
 
