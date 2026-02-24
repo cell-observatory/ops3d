@@ -4,6 +4,8 @@ Specialised CUDA/CPP ops for volumetric computer-vision tasks: Flash Deformable 
 ## Table of Contents
 
 - [Installation](#installation)
+- [Testing](#testing)
+- [Benchmarking](#benchmarking)
 - [Kernels](#kernels)
   - [Flash Deformable 3D Attention](#flash-deformable-3d-attention)
   - [Deformable 3D Convolution Version 4](#deformable-3d-convolution-version-4)
@@ -61,13 +63,58 @@ Compares:
 - **MSDeformAttn** (PyTorch ref): naive implementation
 - **Flash SDPA**: dense cross-attention over all S positions
 
-Options:
-- `--dtype bfloat16|float16|float32` — Data type (default: bfloat16)
-- `--warmup N` — Warmup iterations (default: 5)
-- `--repeats N` — Timed repeats (default: 20)
-- `--config small|medium|large` — Run single problem size (default: all)
+### Config modes
 
-Output includes: wall time (mean ± std), throughput (M elements/s), peak GPU memory, speedup, and ASCII bar visualization.
+Configs mirror [CellObservatoryPlatform](https://github.com/cell-observatory/cell_observatory_platform) settings:
+
+- **Self-attention** (`self_*`): queries = keys = values (e.g. MaskDINO encoder). Each spatial token attends to L×K sampled locations.
+- **Cross-attention** (`cross_*`): object queries attend over spatial tokens (e.g. MaskDINO decoder). Lq = 200 queries.
+
+### Config naming
+
+Configs are named `{mode}_{input}_{strides}`:
+
+- **Input**: `hypercube` (128×256×512), `tile` (256×512×2048)
+- **Strides**: `8`, `16`, `32` or combinations like `8_16`, `16_32`, `8_16_32`
+
+Examples: `self_hypercube_strides_16_32`, `cross_tile_strides_8_16_32`
+
+### CLI options
+
+| Option | Default | Description |
+|--------|---------|--------------|
+| `--dtype` | bfloat16 | Data type: `bfloat16`, `float16`, `float32` |
+| `--warmup` | 5 | Warmup iterations before timing |
+| `--repeats` | 20 | Timed repeats per config |
+| `--config` | all | Config name or fnmatch pattern (e.g. `self_hypercube*`) |
+
+### Examples
+
+```bash
+# Run all configs (default)
+python -m tests.benchmark_flash_deform_attn
+
+# Run a single config
+python -m tests.benchmark_flash_deform_attn --config self_hypercube_strides_16_32
+
+# Run all hypercube self-attention configs
+python -m tests.benchmark_flash_deform_attn --config "self_hypercube*"
+
+# Float32 with fewer repeats for quick checks
+python -m tests.benchmark_flash_deform_attn --dtype float32 --warmup 2 --repeats 5
+```
+
+### Output
+
+Each config prints:
+- **Config**: patch_size, strides, mode, num_heads, embed_dim, num_points, num_queries
+- **Parsed**: N, Lq, M, D, L, K, S, shapes
+- **Metrics**: wall time (mean ± std), throughput (M el/s), peak GPU memory, speedup vs PyTorch ref and Flash SDPA
+- **ASCII bar**: relative timing (shorter = faster)
+
+### OOM handling
+
+If a config runs out of GPU memory, the benchmark catches the error, clears the cache, and continues. The failed config is reported with `OOM (crashed)` in the metrics table.
 
 ## Kernels
 
