@@ -47,10 +47,10 @@ COP_LARGE_DEFAULTS = {
 
 def parse_config(cfg: dict) -> dict:
     """Parse human-readable config into N, M, D, Lq, L, K, shapes."""
-    if "patch_size" not in cfg:
+    if "sample_size" not in cfg:
         return cfg
 
-    patch_size = tuple(cfg["patch_size"])
+    sample_size = tuple(cfg["sample_size"])
     strides = tuple(cfg["strides"])
     num_heads = cfg["num_heads"]
     embed_dim = cfg["embed_dim"]
@@ -58,7 +58,7 @@ def parse_config(cfg: dict) -> dict:
     mode = cfg.get("mode", "self")
     batch_size = cfg.get("batch_size", 1)
 
-    shapes = [[patch_size[i] // s for i in range(3)] for s in strides]
+    shapes = [[sample_size[i] // s for i in range(3)] for s in strides]
     S = sum(prod(s) for s in shapes)
     L = len(strides)
 
@@ -78,7 +78,7 @@ def parse_config(cfg: dict) -> dict:
         "K": K,
         "shapes": shapes,
         "S": S,
-        "patch_size": patch_size,
+        "sample_size": sample_size,
         "strides": strides,
         "mode": mode,
         "num_heads": num_heads,
@@ -105,13 +105,13 @@ INPUT_STRIDE_CONFIGS = [
 
 def build_named_configs():
     configs = []
-    for input_name, patch_size, strides in INPUT_STRIDE_CONFIGS:
+    for input_name, sample_size, strides in INPUT_STRIDE_CONFIGS:
         strides_str = "_".join(map(str, strides))
         for mode in ("self", "cross"):
             cfg = {
                 "name": f"{mode}_{input_name}_strides_{strides_str}",
                 "mode": mode,
-                "patch_size": patch_size,
+                "sample_size": sample_size,
                 "strides": strides,
                 **COP_LARGE_DEFAULTS,
             }
@@ -289,7 +289,7 @@ def run_benchmark(
 
     return {
         "config_name": config["name"],
-        "patch_size": config.get("patch_size"),
+        "sample_size": config.get("sample_size"),
         "strides": config.get("strides"),
         "mode": config.get("mode"),
         "num_heads": config.get("num_heads"),
@@ -344,9 +344,9 @@ def print_results(results):
         print()
         print(f"  [{name}] ({r['dtype']})")
         print("-" * w)
-        if r.get("patch_size") is not None:
+        if r.get("sample_size") is not None:
             print("  Config:")
-            print(f"    patch_size={r['patch_size']}  strides={r.get('strides')}  mode={r.get('mode')}")
+            print(f"    sample_size={r['sample_size']}  strides={r.get('strides')}  mode={r.get('mode')}")
             parts = [
                 f"num_heads={r.get('num_heads')}",
                 f"embed_dim={r.get('embed_dim')}",
@@ -502,7 +502,7 @@ def main():
                 torch.cuda.empty_cache()
                 oom_result = {
                     "config_name": cfg["name"],
-                    "patch_size": cfg.get("patch_size"),
+                    "sample_size": cfg.get("sample_size"),
                     "strides": cfg.get("strides"),
                     "mode": cfg.get("mode"),
                     "num_heads": cfg.get("num_heads"),

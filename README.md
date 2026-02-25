@@ -107,7 +107,7 @@ python -m tests.benchmark_flash_deform_attn --dtype float32 --warmup 2 --repeats
 ### Output
 
 Each config prints:
-- **Config**: patch_size, strides, mode, num_heads, embed_dim, num_points, num_queries
+- **Config**: sample_size, strides, mode, num_heads, embed_dim, num_points, num_queries
 - **Parsed**: N, Lq, M, D, L, K, S, shapes
 - **Metrics**: wall time (mean ± std), throughput (M el/s), peak GPU memory, speedup vs PyTorch ref and Flash SDPA
 - **ASCII bar**: relative timing (shorter = faster)
