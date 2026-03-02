@@ -1,0 +1,178 @@
+{
+    "configurations": [
+        {
+            "name": "tests/",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "pytest",
+            "args": [
+                "-s",
+                "-vvv",
+                "--cache-clear",
+                "--disable-warnings",
+                "--disable-pytest-warnings",
+                "--color=yes",
+                "-r fEX",
+                "--color=yes"
+            ],
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "env": {
+                "PYTHONUNBUFFERED": "1"
+            },
+            "justMyCode": false
+        },
+        {
+          "name": "tests/test_extension",
+          "type": "debugpy",
+          "request": "launch",
+          "module": "pytest",
+          "args": [
+            "-s",
+            "-vvv",
+            "--cache-clear",
+            "--disable-warnings",
+            "--disable-pytest-warnings",
+            "--color=yes",
+            "-r fEX",
+            "tests/test_extension.py"
+          ],
+          "console": "integratedTerminal",
+          "cwd": "${workspaceFolder}",
+          "env": {
+            "PYTHONUNBUFFERED": "1"
+          },
+          "justMyCode": false
+        },
+        {
+            "name": "tests/test_flash_deform_attn",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "pytest",
+            "args": [
+              "-s",
+              "-vvv",
+              "--cache-clear",
+              "--disable-warnings",
+              "--disable-pytest-warnings",
+              "--color=yes",
+              "-r fEX",
+              "tests/test_flash_deform_attn.py"
+            ],
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "env": {
+              "PYTHONUNBUFFERED": "1"
+            },
+            "justMyCode": false
+        },
+        {
+          "name": "tests/test_flash_deform_attn_wrapper",
+          "type": "debugpy",
+          "request": "launch",
+          "module": "pytest",
+          "args": [
+            "-s",
+            "-vvv",
+            "--cache-clear",
+            "--disable-warnings",
+            "--disable-pytest-warnings",
+            "--color=yes",
+            "-r fEX",
+            "tests/test_flash_deform_attn_wrapper.py"
+          ],
+          "console": "integratedTerminal",
+          "cwd": "${workspaceFolder}",
+          "env": {
+            "PYTHONUNBUFFERED": "1"
+          },
+          "justMyCode": false
+      },
+        {
+            "name": "tests/test_flash_deform_attn_stress",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "pytest",
+            "args": [
+              "-s",
+              "-vvv",
+              "--cache-clear",
+              "--disable-warnings",
+              "--disable-pytest-warnings",
+              "--color=yes",
+              "-r fEX",
+              "tests/test_flash_deform_attn_stress.py"
+            ],
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "env": {
+              "PYTHONUNBUFFERED": "1"
+            },
+            "justMyCode": false
+        },
+        {
+          "name": "tests/test_nms",
+          "type": "debugpy",
+          "request": "launch",
+          "module": "pytest",
+          "args": [
+            "-s",
+            "-vvv",
+            "--cache-clear",
+            "--disable-warnings",
+            "--disable-pytest-warnings",
+            "--color=yes",
+            "-r fEX",
+            "tests/test_nms.py"
+          ],
+          "console": "integratedTerminal",
+          "cwd": "${workspaceFolder}",
+          "env": {
+            "PYTHONUNBUFFERED": "1"
+          },
+          "justMyCode": false
+      },
+      {
+        "name": "tests/test_roi_align",
+        "type": "debugpy",
+        "request": "launch",
+        "module": "pytest",
+        "args": [
+          "-s",
+          "-vvv",
+          "--cache-clear",
+          "--disable-warnings",
+          "--disable-pytest-warnings",
+          "--color=yes",
+          "-r fEX",
+          "tests/test_roi_align.py"
+        ],
+        "console": "integratedTerminal",
+        "cwd": "${workspaceFolder}",
+        "env": {
+          "PYTHONUNBUFFERED": "1"
+        },
+        "justMyCode": false
+    },
+    {
+      "name": "tests/benchmark_flash_deform_attn",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "tests/benchmark_flash_deform_attn.py",
+      "args": [
+        "--dtype",
+        "bfloat16",
+        "--warmup",
+        "2",
+        "--repeats",
+        "5"
+      ],
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}",
+      "env": {
+        "PYTHONUNBUFFERED": "1"
+      },
+      "justMyCode": false
+    }
+  ]
+}
