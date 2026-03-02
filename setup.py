@@ -1,13 +1,34 @@
 import os
 import glob
+import subprocess
+import sys
 
-from setuptools import setup
+from setuptools import setup, find_packages
 
 import numpy
 import torch
 
 from torch.utils import cpp_extension
 from torch.utils.cpp_extension import CUDAExtension, CppExtension, CUDA_HOME
+
+
+def run_check_build():
+    """Run template build check before full CUDA compile. Exits on failure."""
+    script = os.path.join(os.path.dirname(os.path.abspath(__file__)), "scripts", "check_build.py")
+    if not os.path.isfile(script):
+        return
+    rc = subprocess.call([sys.executable, script])
+    if rc != 0:
+        print("Template build check failed; aborting full build.", file=sys.stderr)
+        sys.exit(rc)
+
+
+class BuildExtWithCheck(cpp_extension.BuildExtension):
+    """Run template extension check before building the real CUDA extension."""
+
+    def run(self):
+        run_check_build()
+        super().run()
 
 
 def load_requires():
@@ -36,8 +57,10 @@ def get_extensions():
     this_dir = os.path.dirname(os.path.abspath(__file__))
     extensions_dir = os.path.join(this_dir, 'csrc')
 
-    # find all .cpp and .cu files in csrc directory:
-    main_files = glob.glob(os.path.join(extensions_dir, '*.cpp'))
+    main_files = [
+        f for f in glob.glob(os.path.join(extensions_dir, '*.cpp'))
+        if os.path.basename(f) != 'check_build.cpp'
+    ]
     source_cuda = glob.glob(os.path.join(extensions_dir, 'cuda', '*.cu'))
 
     sources = [os.path.relpath(f, start=this_dir) for f in main_files]
@@ -103,11 +126,11 @@ if __name__ == "__main__":
         name="ops3d",
         version='0.1.0',
         description='Custom 3D Operations for PyTorch',
-        packages=["ops3d"],
-        package_dir={"ops3d": "."},
-        # install_requires=load_requires(),
+        packages=find_packages(exclude=["tests", "tests.*"]),
+        package_data={"ops3d": ["*.py"]},
+        install_requires=load_requires(),
         ext_modules=get_extensions(),
-        cmdclass={'build_ext': cpp_extension.BuildExtension},
+        cmdclass={'build_ext': BuildExtWithCheck},
         classifiers=[
             "Programming Language :: Python :: 3",
         ],
