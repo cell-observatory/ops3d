@@ -1,0 +1,54 @@
+{
+  "name": "Cell Observatory OPS3D",
+  "build": {
+    "dockerfile": "../Dockerfile",
+    "context": "..",
+    "options": ["--progress=plain"],
+    "target": "torch_26_01"
+  },
+  "workspaceFolder": "/workspace/ops3d",
+  "containerUser": "ubuntu",
+  "overrideCommand": true,
+  "runArgs": [
+    "-e",
+    "PYTHONUNBUFFERED=1",
+    "--entrypoint=",
+    "--privileged",
+    "--ipc",
+    "host",
+    "--ipc",
+    "host",
+    "--gpus",
+    "all"
+  ],
+  "mounts": [
+    "source=${localWorkspaceFolder}/..,target=/workspace,type=bind,consistency=cached",
+    "source=${localEnv:HOME}/.ssh,target=/home/ubuntu/.ssh,type=bind,consistency=cached",
+    "source=/groups/betzig/betziglab,target=/groups/betzig/betziglab,type=bind,consistency=cached"
+  ],
+  "customizations": {
+    "vscode": {
+      "settings": {
+        "python.defaultInterpreterPath": "/usr/bin/python3",
+        "python.terminal.activateEnvironment": true,
+        "python.terminal.activateEnvInCurrentTerminal": true,
+        "python.linting.enabled": true,
+        "python.linting.flake8Enabled": true,
+        "python.formatting.provider": "black",
+        "python.formatting.blackArgs": ["--line-length", "88"],
+        "editor.formatOnSave": true,
+        "editor.codeActionsOnSave": {
+          "source.organizeImports": "always"
+        }
+      },
+      "extensions": [
+        "ms-python.python",
+        "eamodio.gitlens",
+        "github.vscode-github-actions",
+        "mechatroner.rainbow-csv"
+      ]
+    }
+  },
+  "postCreateCommand": "cd /workspace/ops3d && export PATH=$PATH:/home/ubuntu/.local/bin && pip install bpytop  --no-dependencies && cp ~/.bashrc /tmp/host_bashrc && echo 'source /tmp/host_bashrc' >> ~/.bashrc && python3 --version",
+  "postStartCommand": "cd /workspace/ops3d && export PATH=$PATH:/home/ubuntu/.local/bin && source ~/.bashrc"
+}
