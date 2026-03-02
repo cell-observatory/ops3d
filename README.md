@@ -14,23 +14,38 @@ Specialised CUDA/CPP ops for volumetric computer-vision tasks: Flash Deformable 
   
 ## Installation
 
-This package has been tested on **CUDA 12.4** with **PyTorch 2.4.1** and **Python 3.10**. We recommend using a dedicated `conda` environment.
+This package has been tested on **CUDA 13.1** with **PyTorch 2.10** and **Python 3.12**. 
+
+### Docker
 
 ```bash
-# 1. Create & activate conda environment
-conda create -n ops3d python=3.10
-conda activate ops3d
+docker pull ghcr.io/cell-observatory/ops3d:main_torch_26_01
+docker run --network host -u 1000 --privileged -v $(pwd):/workspace/ops3d -w /workspace/ops3d --env PYTHONUNBUFFERED=1 --pull missing -it --rm  --ipc host --gpus all ghcr.io/cell-observatory/ops3d:main_torch_26_01 bash
+```
 
-# 2. Clone the repository
-https://github.com/cell-observatory/ops3d.git
+### Running docker image on a cluster via apptainer
+```shell
+apptainer pull --arch amd64 --force ops3d_26_01.sif docker://ghcr.io/cell-observatory/ops3d:main_torch_26_01
+```
+
+### Built distribution
+```bash
+git clone https://github.com/cell-observatory/ops3d.git
 cd ops3d
 
-# 3. Install package in editable mode
-pip install -e .
-
-# 4. (Optional) Install dev dependencies for testing
-pip install -r requirements-dev.txt
+pip install /dist/ops3d-0.1.0-cp312-cp312-linux_x86_64.whl
 ```
+
+### From source
+
+```bash
+git clone https://github.com/cell-observatory/ops3d.git
+cd ops3d
+
+# Install in editable mode
+pip install -e .
+```
+
 
 ## Testing
 
@@ -65,7 +80,7 @@ Compares:
 
 ### Config modes
 
-Configs mirror [CellObservatoryPlatform](https://github.com/cell-observatory/cell_observatory_platform) settings:
+Configs mirror [CellObservatoryPlatform](https://github.com/cell-observatory/ops3d) settings:
 
 - **Self-attention** (`self_*`): queries = keys = values (e.g. MaskDINO encoder). Each spatial token attends to L×K sampled locations.
 - **Cross-attention** (`cross_*`): object queries attend over spatial tokens (e.g. MaskDINO decoder). Lq = 200 queries.
@@ -297,3 +312,14 @@ Shared : maskSH[G_blk,K]              // logits for this block
 ### ROI-Align 3D  <a id="roi-align-3d"></a>
 
 3-D ROI-Align CUDA/CPP kernel from https://github.com/TimothyZero/MedVision.
+
+
+# License
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at:
+
+   [Apache License 2.0](LICENSE)
+
+Copyright 2025 Cell Observatory.
