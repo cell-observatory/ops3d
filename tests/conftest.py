@@ -18,25 +18,6 @@ pytest.importorskip("torch.cuda")
 if not torch.cuda.is_available():
     pytest.skip("CUDA not available", allow_module_level=True)
 
-# Skip if ops3d._C not compiled
-try:
-    import ops3d._C as _C  # noqa: F401
-    OPS3D_AVAILABLE = True
-except ImportError:
-    OPS3D_AVAILABLE = False
-
-
-def pytest_configure(config):
-    config.addinivalue_line(
-        "markers",
-        "gpu_stress: stress tests (slow, run with -m gpu_stress)",
-    )
-    if not OPS3D_AVAILABLE:
-        config.addinivalue_line(
-            "markers",
-            "skip_no_ops3d: skip when ops3d._C is not compiled (run pip install -e .)",
-        )
-
 
 @pytest.fixture(scope="session")
 def device():

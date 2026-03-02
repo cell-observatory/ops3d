@@ -16,6 +16,7 @@ from __future__ import absolute_import, division, print_function
 
 import argparse
 import fnmatch
+import math
 import sys
 import time
 from math import prod
@@ -30,10 +31,22 @@ import torch
 import torch.nn.functional as F
 from torch.nn.attention import SDPBackend, sdpa_kernel
 
-from tests.flash_deform_attn import (
+from ops3d import (
     FlashDeformAttnFunction,
     ms_deform_attn_core_pytorch_3d,
 )
+
+
+def _flash_sdpa_available(device, dtype):
+    try:
+        q = torch.randn(1, 1, 2, 4, device=device, dtype=dtype)
+        k = torch.randn(1, 1, 2, 4, device=device, dtype=dtype)
+        v = torch.randn(1, 1, 2, 4, device=device, dtype=dtype)
+        with sdpa_kernel([SDPBackend.FLASH_ATTENTION]):
+            F.scaled_dot_product_attention(q, k, v)
+        return True
+    except RuntimeError:
+        return False
 
 
 COP_LARGE_DEFAULTS = {
@@ -152,6 +165,7 @@ def run_benchmark(
     warmup,
     repeats,
     im2col_step=64,
+    flash_available=True,
 ):
     """Run kernel and reference, return timing and memory stats."""
     shapes = torch.tensor(config["shapes"], dtype=torch.long, device=device)
@@ -243,6 +257,7 @@ def run_benchmark(
                 [SDPBackend.FLASH_ATTENTION]
             ):
                 out = F.scaled_dot_product_attention(q, k, v)
+                
         torch.cuda.synchronize()
         elapsed = time.perf_counter() - start
         mem_peak = torch.cuda.max_memory_allocated()
@@ -253,7 +268,8 @@ def run_benchmark(
     for _ in range(warmup):
         run_kernel()
         run_reference()
-        run_flash()
+        if flash_available:
+            run_flash()
 
     # Timed runs
     kernel_times = []
@@ -269,23 +285,31 @@ def run_benchmark(
         t, _, mp = run_reference()
         ref_times.append(t)
         ref_mem_peak = max(ref_mem_peak, mp)
-        t, _, mp = run_flash()
-        flash_times.append(t)
-        flash_mem_peak = max(flash_mem_peak, mp)
+        if flash_available:
+            t, _, mp = run_flash()
+            flash_times.append(t)
+            flash_mem_peak = max(flash_mem_peak, mp)
 
+    n_elements = N * Lq * M * D
     kernel_mean = sum(kernel_times) / len(kernel_times)
     kernel_std = (sum((t - kernel_mean) ** 2 for t in kernel_times) / len(kernel_times)) ** 0.5
     ref_mean = sum(ref_times) / len(ref_times)
     ref_std = (sum((t - ref_mean) ** 2 for t in ref_times) / len(ref_times)) ** 0.5
-    flash_mean = sum(flash_times) / len(flash_times)
-    flash_std = (sum((t - flash_mean) ** 2 for t in flash_times) / len(flash_times)) ** 0.5
+    if flash_available and flash_times:
+        flash_mean = sum(flash_times) / len(flash_times)
+        flash_std = (sum((t - flash_mean) ** 2 for t in flash_times) / len(flash_times)) ** 0.5
+        speedup_vs_flash = flash_mean / kernel_mean
+        flash_throughput = n_elements / flash_mean
+    else:
+        flash_mean = float("nan")
+        flash_std = float("nan")
+        speedup_vs_flash = float("nan")
+        flash_throughput = float("nan")
+        flash_mem_peak = 0
 
-    n_elements = N * Lq * M * D
     kernel_throughput = n_elements / kernel_mean
     ref_throughput = n_elements / ref_mean
-    flash_throughput = n_elements / flash_mean
     speedup_vs_ref = ref_mean / kernel_mean
-    speedup_vs_flash = flash_mean / kernel_mean
 
     return {
         "config_name": config["name"],
@@ -385,11 +409,15 @@ def print_results(results):
         ref_std = r["ref_std_ms"]
         flash_mean = r["flash_mean_ms"]
         flash_std = r["flash_std_ms"]
+        flash_na = math.isnan(flash_mean)
 
         k_time = f"{k_mean:.2f} ± {k_std:.2f} ms"
         r_time = f"{ref_mean:.2f} ± {ref_std:.2f} ms"
-        f_time = f"{flash_mean:.2f} ± {flash_std:.2f} ms"
-        speedup_str = f"{r['speedup_vs_ref']:.2f}x / {r['speedup_vs_flash']:.2f}x"
+        f_time = "N/A" if flash_na else f"{flash_mean:.2f} ± {flash_std:.2f} ms"
+        if flash_na:
+            speedup_str = f"{r['speedup_vs_ref']:.2f}x / N/A"
+        else:
+            speedup_str = f"{r['speedup_vs_ref']:.2f}x / {r['speedup_vs_flash']:.2f}x"
 
         def row(metric, k_val, r_val, f_val, imp_val):
             return f"  {metric:<{mw}} {k_val:>{cw}} {r_val:>{cw}} {f_val:>{cw}} {imp_val:>{sw}}"
@@ -397,38 +425,48 @@ def print_results(results):
         print(row("Metric", "MSDeform", "PyTorch Ref", "Flash SDPA", "MSDeform Improvement"))
         print(sep)
         print(row("Time (mean ± std)", k_time, r_time, f_time, speedup_str))
+        flash_throughput_str = "N/A" if flash_na else f"{r['flash_throughput_Mel_s']:.2f}"
         print(
             row(
                 "Throughput (M el/s)",
                 f"{r['kernel_throughput_Mel_s']:.2f}",
                 f"{r['ref_throughput_Mel_s']:.2f}",
-                f"{r['flash_throughput_Mel_s']:.2f}",
+                flash_throughput_str,
                 speedup_str,
             )
         )
         ref_mem_ratio = r["ref_mem_peak"] / r["kernel_mem_peak"] if r["kernel_mem_peak"] > 0 else 0
-        flash_mem_ratio = r["flash_mem_peak"] / r["kernel_mem_peak"] if r["kernel_mem_peak"] > 0 else 0
-        mem_speedup = f"{ref_mem_ratio:.2f}x / {flash_mem_ratio:.2f}x"
+        flash_mem_ratio = (
+            r["flash_mem_peak"] / r["kernel_mem_peak"] if r["kernel_mem_peak"] > 0 and not flash_na else 0
+        )
+        mem_speedup = f"{ref_mem_ratio:.2f}x / {flash_mem_ratio:.2f}x" if not flash_na else f"{ref_mem_ratio:.2f}x / N/A"
+        flash_mem_str = "N/A" if flash_na else _format_bytes(r["flash_mem_peak"])
         print(
             row(
                 "Peak GPU memory",
                 _format_bytes(r["kernel_mem_peak"]),
                 _format_bytes(r["ref_mem_peak"]),
-                _format_bytes(r["flash_mem_peak"]),
+                flash_mem_str,
                 mem_speedup,
             )
         )
 
-        # ASCII bar: all three (shorter bar = faster)
-        max_time = max(k_mean, ref_mean, flash_mean)
-        k_bar = k_mean / max_time if max_time > 0 else 0
-        ref_bar = ref_mean / max_time if max_time > 0 else 0
-        flash_bar = flash_mean / max_time if max_time > 0 else 0
+        # ASCII bar: all three (shorter bar = faster), or two when Flash N/A
+        max_time = max(k_mean, ref_mean, flash_mean if not flash_na else 0)
+        if max_time > 0:
+            k_bar = k_mean / max_time
+            ref_bar = ref_mean / max_time
+            flash_bar = flash_mean / max_time if not flash_na else 0
+        else:
+            k_bar = ref_bar = flash_bar = 0
         print()
         print(f"  Relative time (shorter bar = faster):")
         print(f"    MSDeform   {_bar(k_bar)} {_format_time(k_mean / 1000)}")
         print(f"    PyTorch   {_bar(ref_bar)} {_format_time(ref_mean / 1000)}")
-        print(f"    Flash     {_bar(flash_bar)} {_format_time(flash_mean / 1000)}")
+        if flash_na:
+            print(f"    Flash     N/A (kernel not available on this GPU)")
+        else:
+            print(f"    Flash     {_bar(flash_bar)} {_format_time(flash_mean / 1000)}")
         print()
 
     print("=" * w)
@@ -492,10 +530,16 @@ def main():
             print(f"No configs match: {args.config}")
             sys.exit(1)
 
+    flash_available = _flash_sdpa_available(device, dtype)
+    if not flash_available:
+        print("Note: Flash SDPA not available on this GPU (e.g. requires sm80+). Flash SDPA column will show N/A.")
+
     results = []
     for cfg in configs:
         try:
-            r = run_benchmark(cfg, device, dtype, args.warmup, args.repeats)
+            r = run_benchmark(
+                cfg, device, dtype, args.warmup, args.repeats, flash_available=flash_available
+            )
             results.append(r)
         except (torch.cuda.OutOfMemoryError, RuntimeError) as e:
             if "out of memory" in str(e).lower() or "OutOfMemoryError" in type(e).__name__:

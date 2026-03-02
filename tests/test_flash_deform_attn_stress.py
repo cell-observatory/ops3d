@@ -6,11 +6,10 @@ import pytest
 import torch
 import torch.nn.functional as F
 
-from tests.flash_deform_attn import (
+from ops3d import (
     FlashDeformAttnFunction,
     ms_deform_attn_core_pytorch_3d,
 )
-from tests.conftest import OPS3D_AVAILABLE
 
 
 def _make_inputs(N, M, D, Lq, L, K, shapes, device, dtype=torch.float32, seed=42):
@@ -66,10 +65,6 @@ EDGE_SHAPE_CASES = [
 
 
 @pytest.mark.gpu_stress
-@pytest.mark.skipif(
-    not OPS3D_AVAILABLE,
-    reason="ops3d._C not compiled; run pip install -e .",
-)
 @pytest.mark.parametrize("L,spatial_single,B", EDGE_SHAPE_CASES)
 @pytest.mark.parametrize("K", [4, 8])
 @torch.no_grad()
@@ -103,10 +98,6 @@ def test_forward_edge_shapes(L, spatial_single, B, K, device):
 
 
 @pytest.mark.gpu_stress
-@pytest.mark.skipif(
-    not OPS3D_AVAILABLE,
-    reason="ops3d._C not compiled; run pip install -e .",
-)
 @torch.no_grad()
 def test_forward_uneven_levels(device):
     """Multilevel with very different spatial sizes."""
@@ -129,10 +120,6 @@ def test_forward_uneven_levels(device):
 
 
 @pytest.mark.gpu_stress
-@pytest.mark.skipif(
-    not OPS3D_AVAILABLE,
-    reason="ops3d._C not compiled; run pip install -e .",
-)
 @torch.no_grad()
 def test_forward_anisotropic_multilevel(device):
     """Anisotropic multi-level: [[32,16,8], [16,8,4]]."""
@@ -162,10 +149,6 @@ def test_forward_anisotropic_multilevel(device):
 
 
 @pytest.mark.gpu_stress
-@pytest.mark.skipif(
-    not OPS3D_AVAILABLE,
-    reason="ops3d._C not compiled; run pip install -e .",
-)
 def test_invalid_batch_not_divisible_by_im2col_step(device):
     """batch % im2col_step != 0 raises (kernel uses im2col_step_=min(batch,im2col_step))."""
     N, M, D, Lq, L, K = 5, 4, 32, 64, 2, 4
@@ -183,10 +166,6 @@ def test_invalid_batch_not_divisible_by_im2col_step(device):
 
 
 @pytest.mark.gpu_stress
-@pytest.mark.skipif(
-    not OPS3D_AVAILABLE,
-    reason="ops3d._C not compiled; run pip install -e .",
-)
 def test_invalid_L6(device):
     """L=6 (unsupported) raises."""
     N, M, D, Lq, L, K = 1, 4, 32, 64, 6, 4
@@ -206,10 +185,6 @@ def test_invalid_L6(device):
 
 
 @pytest.mark.gpu_stress
-@pytest.mark.skipif(
-    not OPS3D_AVAILABLE,
-    reason="ops3d._C not compiled; run pip install -e .",
-)
 def test_invalid_cpu_tensors(device):
     """CPU tensors raise."""
     N, M, D, Lq, L, K = 1, 4, 32, 64, 2, 4
@@ -227,10 +202,6 @@ def test_invalid_cpu_tensors(device):
 
 
 @pytest.mark.gpu_stress
-@pytest.mark.skipif(
-    not OPS3D_AVAILABLE,
-    reason="ops3d._C not compiled; run pip install -e .",
-)
 def test_invalid_shape_mismatch(device):
     """sampling_loc_attn level count mismatch vs value raises ValueError."""
     N, M, D, Lq, L, K = 1, 4, 32, 64, 2, 4
@@ -267,10 +238,6 @@ def test_invalid_shape_mismatch(device):
 
 
 @pytest.mark.gpu_stress
-@pytest.mark.skipif(
-    not OPS3D_AVAILABLE,
-    reason="ops3d._C not compiled; run pip install -e .",
-)
 @torch.no_grad()
 def test_numeric_zeros(device, stress_params):
     """value=0, uniform attn, locs=0.5 -> allclose vs ref, no NaN/Inf."""
@@ -304,10 +271,6 @@ def test_numeric_zeros(device, stress_params):
 
 
 @pytest.mark.gpu_stress
-@pytest.mark.skipif(
-    not OPS3D_AVAILABLE,
-    reason="ops3d._C not compiled; run pip install -e .",
-)
 @torch.no_grad()
 def test_numeric_small_values(device, stress_params):
     """Small values (1e-6 scale) -> allclose vs ref."""
@@ -339,10 +302,6 @@ def test_numeric_small_values(device, stress_params):
 
 
 @pytest.mark.gpu_stress
-@pytest.mark.skipif(
-    not OPS3D_AVAILABLE,
-    reason="ops3d._C not compiled; run pip install -e .",
-)
 @torch.no_grad()
 def test_numeric_large_values_fp32(device, stress_params):
     """Large value scale (1e4) in fp32 -> no crash, allclose vs ref."""
@@ -366,10 +325,6 @@ def test_numeric_large_values_fp32(device, stress_params):
 
 
 @pytest.mark.gpu_stress
-@pytest.mark.skipif(
-    not OPS3D_AVAILABLE,
-    reason="ops3d._C not compiled; run pip install -e .",
-)
 @torch.no_grad()
 def test_numeric_fp16(device, stress_params):
     """float16 -> allclose vs ref with relaxed tol."""
@@ -395,10 +350,6 @@ def test_numeric_fp16(device, stress_params):
 
 
 @pytest.mark.gpu_stress
-@pytest.mark.skipif(
-    not OPS3D_AVAILABLE,
-    reason="ops3d._C not compiled; run pip install -e .",
-)
 @torch.no_grad()
 def test_numeric_bfloat16(device, stress_params):
     """bfloat16 -> allclose vs ref if supported."""
@@ -432,10 +383,6 @@ def test_numeric_bfloat16(device, stress_params):
 
 
 @pytest.mark.gpu_stress
-@pytest.mark.skipif(
-    not OPS3D_AVAILABLE,
-    reason="ops3d._C not compiled; run pip install -e .",
-)
 def test_gradient_zero_grad_output(device):
     """Zero grad_output -> backward yields zero gradients."""
     N, M, D, Lq, L, K = 1, 4, 32, 64, 2, 4
