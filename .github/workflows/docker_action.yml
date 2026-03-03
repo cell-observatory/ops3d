@@ -568,12 +568,12 @@ jobs:
       - name: Test NVIDIA-SMI
         run: ${{ steps.apptainer_run.outputs.APPTAINER_RUN }} nvidia-smi
 
-      - name: pytest /tests
+      - name: pytest tests
         if: ${{ env.TESTING }}
         uses: nick-fields/retry@v3
         with:
           max_attempts: 2
-          command: ${{ steps.apptainer_run.outputs.APPTAINER_RUN }} ${{ env.PYTEST }}_utils.xml tests/utils
+          command: ${{ steps.apptainer_run.outputs.APPTAINER_RUN }} ${{ env.PYTEST }}.xml tests
 
       - name: print testmon2
         run: ${{ steps.apptainer_run.outputs.APPTAINER_RUN }} ls -lhXRa ~/.cache/TESTMON
