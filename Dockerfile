@@ -1,3 +1,8 @@
+# docker buildx build . --tag ghcr.io/cell-observatory/ops3d:main_torch_26_01 --build-arg BRANCH_NAME=$(git branch --show-current) --target torch_25_08 --progress=plain --no-cache-filter pip_install
+
+# docker run --network host -u 1000 --privileged -v ~/.ssh:/sshkey -v ${PWD}:/workspace/ops3d --env PYTHONUNBUFFERED=1 --pull missing -t -i --rm -w /workspace/ops3d --ipc host --gpus all ghcr.io/cell-observatory/ops3d:develop_torch_26_01 bash
+
+
 FROM nvcr.io/nvidia/pytorch:26.01-py3 AS base
 ENV RUNNING_IN_DOCKER=TRUE
 
@@ -49,8 +54,9 @@ RUN --mount=type=cache,target=/root/.cache/pip \
     pip install -r requirements.txt --progress-bar off --root-user-action=ignore --cache-dir /root/.cache/pip 
 
 RUN echo "Compile ops3d kernels"
-COPY dist/ /dist/
-RUN pip install /dist/*.whl 
+# RUN python setup.py bdist_wheel
+COPY dist/*.whl .
+RUN pip install ops3d-0.1.0-cp312-cp312-linux_x86_64.whl 
 
 # Code to avoid running as root
 ARG USERNAME=user1000
