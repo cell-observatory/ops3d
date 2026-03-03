@@ -29,13 +29,13 @@ def default_forward_params():
     """Params matching cell_observatory test_flash_deform_attn_fwd."""
     N = 1
     M = 8
-    D = 128
+    D = 64
     Lq = 16 * 16 * 16
     L = 4
     K = 8
     im2col_step = 128
     shapes = torch.tensor(
-        [[16, 16, 16], [8, 8, 8]],
+        [[64, 64, 64], [32, 32, 32], [16, 16, 16], [8, 8, 8]],
         dtype=torch.long,
         device="cuda",
     )
