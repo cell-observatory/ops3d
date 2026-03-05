@@ -56,7 +56,15 @@ RUN --mount=type=cache,target=/root/.cache/pip \
 RUN echo "Compile ops3d kernels"
 # RUN python setup.py bdist_wheel
 COPY dist/*.whl .
-RUN pip install ops3d-0.1.0-cp312-cp312-linux_x86_64.whl 
+
+IF [ "$(uname -m)" = "x86_64" ]; then
+    RUN pip install ops3d-0.1.0-cp312-cp312-linux_x86_64.whl
+elif [ "$(uname -m)" = "aarch64" ]; then
+    RUN pip install ops3d-0.1.0-cp312-cp312-linux_aarch64.whl
+else
+    RUN echo "Unsupported architecture"
+    RUN exit 1
+fi
 
 # Code to avoid running as root
 ARG USERNAME=user1000
